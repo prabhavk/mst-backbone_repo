@@ -3,55 +3,23 @@
     
 import math as m
 from scipy.linalg import expm, logm, eig
-from scipy.optimize import minimize
+
 from numpy.linalg import inv, eig, det, lstsq
-from numpy.random import uniform, choice, dirichlet
+from numpy.random import uniform, choice
 from numpy import diag, array, matrix, append
 import numpy as np
 from math import exp, log
 from decimal import Decimal
 import cmath as cm
+from scipy.linalg.decomp_schur import schur
+from scipy.linalg._matfuncs_inv_ssq import _logm_force_nonsingular_triangular_matrix,\
+    _logm_triu
 DNA=["A","C","G","T"]
-# DNA = ["T","C","A","G"] # INDELIBLE INDEX
 
-
-
-
-def Generate_rate_vectors(gc_diff):
-    pi_root = Generate_pi_from_Dirichlet(concentration=[0.25, 0.25, 0.25, 0.25])
-    # Generate Q_root from pi
-    Q_root = GenerateQForStationaryDistribution(pi_root)
-    # Generate pi_tree based on GC diff
-    pi_tree = Evolve_pi(pi_root,gc_diff)
-    # Generate Q_tree from pi_tree
-    Q_tree = GenerateQForStationaryDistribution(pi_tree)
-    free_rates_root = Get11FreeRates(Q_root)
-    free_rates_tree = Get11FreeRates(Q_tree)
-    return([free_rates_root,free_rates_tree])
-
-
-def Generate_pi_from_Dirichlet(concentration=[0.25,0.25,0.25,0.25]):
-    return(dirichlet(concentration,1)[0])
-
-def Evolve_pi(pi,gc_diff):    
-    delta_pi = [-0.5 * gc_diff, 0.5 * gc_diff, - 0.5 * gc_diff, 0.5 * gc_diff]
-    pi_evolved = pi[:]
-    for i in range(4):
-        pi_evolved[i] += delta_pi[i]  
-    return(pi_evolved)
 
 def GenerateProbabilityDistribution():
     p = map(lambda x: uniform(size=1)[0],range(4))
     p /= sum(p)
-    return p
-
-def GenerateProbabilityDistributionWithMinVal(p_min):
-    continueTrying = True
-    while (continueTrying): 
-        p = list(map(lambda x: uniform(size=1)[0],range(4)))
-        p /= sum(p)
-        if (min(p) > p_min):
-            continueTrying = False
     return p
 
 def GetStationaryDistribution(Q):
@@ -59,32 +27,8 @@ def GetStationaryDistribution(Q):
     b.shape=(5,1)
     Q_aug = np.c_[np.ones(4),Q]
     Q_aug = Q_aug.transpose()
-    pi = lstsq(Q_aug,b,rcond=-1)[0]
-    return (pi)
-    
-def Get11FreeRates(Q):
-    rates_11 = []    
-    for i in range(4):
-        for j in range(4):
-            if (i != j):                
-                if (len(rates_11) < 11):
-                    rates_11.append(Q[i,j]/Q[3,2])
-    return (rates_11)
-
-def GetCalibratedRateMatrixFrom11FreeRates(rates_11):
-    Q = array([[0.0]*4]*4)    
-    a,b,c,d,e,f,g,h,i,j,k = rates_11
-    l = 1
-    D1 = -(a+b+c)
-    D2 = -(d+e+f)
-    D3 = -(g+h+i)
-    D4 = -(j+k+l)
-    Q[0,] = [D1, a, b, c]
-    Q[1,] = [d, D2, e, f]
-    Q[2,] = [g, h, D3, i]
-    Q[3,] = [j, k, l, D4]
-    Q_cal = NormalizeQMatrix(Q)
-    return (Q_cal)
+    eq_dist = lstsq(Q_aug,b)[0]
+    return eq_dist
 
 # GTR rate matrix
 def GenerateQ_GTR(stationaryDistribution,rates):
@@ -113,48 +57,12 @@ def GenerateQ(rates):
     Q/=mu
     return(Q)
 
-def GenerateQForStationaryDistribution(stationary_distribution):
-    pi = array([0.0]*4)
-    for i in range(4):
-        pi[i] = stationary_distribution[i]    
-    Q = array([[0.0]*4]*4)
-    params = [1]*11
-
-    def ConstructRateMatrixFromParams(params):
-        a,b,c,d,e,f,g,h,i,j,k = params
-        l = 1
-        D1 = -(a+b+c)
-        D2 = -(d+e+f)
-        D3 = -(g+h+i)
-        D4 = -(j+k+l)
-        Q[0,] = [D1, a, b, c]
-        Q[1,] = [d, D2, e, f]
-        Q[2,] = [g, h, D3, i]
-        Q[3,] = [j, k, l, D4]
-        return (Q)
-
-    def penalty(params):
-        Q = ConstructRateMatrixFromParams(params)
-        product = pi.dot(Q)
-        penalty = sum(map(abs,product))
-        if (min(params) < 0):
-            penalty *= 10
-        return (penalty)
-
-    res = minimize(penalty,params,method='Nelder-Mead')
-    assert(min(res.x)>0)
-    Q_res = ConstructRateMatrixFromParams(res.x)
-    pi_s = GetStationaryDistribution(Q_res)
-    # print(pi_s)
-    Q_norm = NormalizeQMatrix(Q_res)
-    return (Q_norm)
-
 def NormalizeQMatrix(Q):
     b = array([1,0,0,0,0])
     b.shape=(5,1)
     Q_aug = np.c_[np.ones(4),Q]
     Q_aug = Q_aug.transpose()
-    eq_dist = lstsq(Q_aug,b,rcond=-1)[0]
+    eq_dist = lstsq(Q_aug,b)[0]
     mu = 0
     for i in range(4):
         mu -= eq_dist[i]*Q[i,i]
@@ -275,55 +183,21 @@ def GenerateRandomQ():
         
     return NormalizeQMatrix(Q)
 
-def GenerateQForBaseFreq_via_optimization_depr(stationaryDist):
+def GenerateQForBaseFreq(stationaryDist):
     Q = array([[0.0]*4]*4)
     pi_1 = stationaryDist[0]
     pi_2 = stationaryDist[1]
     pi_3 = stationaryDist[2]
     pi_4 = 1 - pi_1 - pi_2 - pi_3
     a, b, c, d, e, f, g, h = uniform(0,1,8)
-    i = (1-(pi_1*(a+b+2*c)+pi_2*(d+e+2*f)+pi_3*(g+h)))/(2*pi_3)
+    i = (1-(pi_1*(a+b+2*c)+pi_2*(d+e+2*f)+pi_3*(g+h)))/(2*pi_3);
     print ("i", i)
-    j = (pi_1*(a+b+c)-pi_2*d-pi_3*g)/pi_4
+    j = (pi_1*(a+b+c)-pi_2*d-pi_3*g)/pi_4;
     print ("j", j)
-    k = (pi_2*(d+e+f)-pi_1*a-pi_3*h)/pi_4
-    print ("k", k)
-    l = (1+pi_3*(g+h)-pi_1*(a+2*c+3*b)-pi_2*(d+2*f+3*e))/(2*pi_4)
-    print ("l", l)
-    if i < 0:
-        print ("i is less than zero")
-    if j < 0:
-        print ("j is less than zero")
-    if k < 0:
-        print ("k is less than zero")
-    if l < 0:
-        print ("l is less than zero")
-    D1 = -(a+b+c)
-    D2 = -(d+e+f)
-    D3 = -(g+h+i)
-    D4 = -(j+k+l)
-    Q[0,] = [D1, a, b, c]
-    Q[1,] = [d, D2, e, f]
-    Q[2,] = [g, h, D3, i]
-    Q[3,] = [j, k, l, D4]
-         
-    return Q
-
-def GenerateQForBaseFreq_algebraically_depr(stationaryDist):
-    Q = array([[0.0]*4]*4)
-    pi_1 = stationaryDist[0]
-    pi_2 = stationaryDist[1]
-    pi_3 = stationaryDist[2]
-    pi_4 = 1 - pi_1 - pi_2 - pi_3
-    a, b, c, d, e, f, g, h = uniform(0,1,8)
-    i = (1-(pi_1*(a+b+2*c)+pi_2*(d+e+2*f)+pi_3*(g+h)))/(2*pi_3)
-    print ("i", i)
-    j = (pi_1*(a+b+c)-pi_2*d-pi_3*g)/pi_4
-    print ("j", j)
-    k = (pi_2*(d+e+f)-pi_1*a-pi_3*h)/pi_4
-    print ("k", k)
-    l = (1+pi_3*(g+h)-pi_1*(a+2*c+3*b)-pi_2*(d+2*f+3*e))/(2*pi_4)
-    print ("l", l)
+    k = (pi_2*(d+e+f)-pi_1*a-pi_3*h)/pi_4;
+    print ("k"), k
+    l = (1+pi_3*(g+h)-pi_1*(a+2*c+3*b)-pi_2*(d+2*f+3*e))/(2*pi_4);
+    print ("l"), l
     if i < 0:
         print ("i is less than zero")
     if j < 0:
@@ -352,6 +226,7 @@ def GenerateRandomQWithAribitrayPrecisionArithmetic():
         Q[i,i] = -sum(Q[i,:])    
         
     return NormalizeQMatrix(Q)
+
 
 
 # Generates a rate matrix by computing the matrix logarithm of a randomly set 

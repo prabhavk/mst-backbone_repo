@@ -11,9 +11,10 @@ using namespace std;
 #include <array>
 #include <stdio.h>
 #include <tuple>
-#include <eigen3/Eigen/Dense>
-#include <eigen3/unsupported/Eigen/MatrixFunctions>
-using namespace Eigen;
+#include <math.h>
+// #include <eigen3/Eigen/Dense>
+// #include <eigen3/unsupported/Eigen/MatrixFunctions>
+// using namespace Eigen;
 class Utilities {
 public: 
 //	tuple <vector<vector<unsigned char>>,vector<int>,vector<vector<int>>> GetCompressedSequencesSiteWeights(vector<MST_vertex*> mstVertexPtrList);	
@@ -25,32 +26,32 @@ public:
 		
 	}
 };
-Matrix4f ConstructRateMatrix(vector <float> parameters);
+// Matrix4f ConstructRateMatrix(vector <float> parameters);
 
-Matrix4f ConstructRateMatrix(vector <float> parameters){
-	float p1 = parameters[0];
-	float p2 = parameters[1];
-	float p3 = parameters[2];
-	float a = parameters[3];
-	float b = parameters[4];
-	float c = parameters[5];
-	float d = parameters[6];
-	float e = parameters[7];
-	float f = parameters[8];
-	float g = parameters[9];
-	float h = parameters[10];
-	float p4 = 1-(p1+p2+p3);
-	float j = -1*(-p1*(a+b+c)+p2*d+p3*g)/p4;	
-	float k = -1*(-p2*(d+e+f)+p1*a+p3*h)/p4;	
-	float i = (1-(p1*(a+c)+p2*(d+f)+2*p3*(g+h)+p4*(j+k)))/(2*p3);
-	float l = -1*(-p3*(g+h+i)+p1*b+p2*e)/p4;	
-	Matrix4f Q;
-	Q	<< -(a+b+c) , a , b , c,
-		 d , -(d+e+f) , e , f,
-		 g , h , -(g+h+i) , i,
-		 j , k , l , -(j+k+l);
-	return Q;
-}
+// Matrix4f ConstructRateMatrix(vector <float> parameters){
+// 	float p1 = parameters[0];
+// 	float p2 = parameters[1];
+// 	float p3 = parameters[2];
+// 	float a = parameters[3];
+// 	float b = parameters[4];
+// 	float c = parameters[5];
+// 	float d = parameters[6];
+// 	float e = parameters[7];
+// 	float f = parameters[8];
+// 	float g = parameters[9];
+// 	float h = parameters[10];
+// 	float p4 = 1-(p1+p2+p3);
+// 	float j = -1*(-p1*(a+b+c)+p2*d+p3*g)/p4;	
+// 	float k = -1*(-p2*(d+e+f)+p1*a+p3*h)/p4;	
+// 	float i = (1-(p1*(a+c)+p2*(d+f)+2*p3*(g+h)+p4*(j+k)))/(2*p3);
+// 	float l = -1*(-p3*(g+h+i)+p1*b+p2*e)/p4;	
+// 	Matrix4f Q;
+// 	Q	<< -(a+b+c) , a , b , c,
+// 		 d , -(d+e+f) , e , f,
+// 		 g , h , -(g+h+i) , i,
+// 		 j , k , l , -(j+k+l);
+// 	return Q;
+// }
 
 string EncodeAsDNA(vector<unsigned char> sequence);
 
@@ -155,36 +156,36 @@ float ComputeDeterminantOfFourByFourMatrix(array<array<float,4>,4>* M){
 	return (determinant);
 }
 
-float ComputeLogDetDistance(vector<unsigned char> * seq1, vector <unsigned char> * seq2);
+// float ComputeLogDetDistance(vector<unsigned char> * seq1, vector <unsigned char> * seq2);
 
-float ComputeLogDetDistance(vector<unsigned char> * seq1, vector <unsigned char> * seq2){
-	array<array<float,4>,4> F;
-	float logDet = 0.0;
-	int seqLength = seq1->size();
-	float d = 1/float(seqLength);
-	for (int i = 0; i < 4; i++){
-		for (int j = 0; j < 4; j++){
-			F[i][j] = 0;
-		}
-	}
-	for (int pos = 0 ; pos < seqLength; pos ++){
-		F[(*seq1)[pos]][(*seq2)[pos]] += d;
-	}
-//	f1_a, f1_c, f1_g, f1_t = GetBaseFreq(seq1)
-	array <float, 4> f1 = GetBaseFreq(seq1);
-//   g1 = f1_a*f1_c*f1_g*f1_t
-	float g1 = f1[0]*f1[1]*f1[2]*f1[3];
-//  f2_a, f2_c, f2_g, f2_t = GetBaseFreq(seq2)
-	array <float, 4> f2 = GetBaseFreq(seq2);    
-//  g2 = f2_a*f2_c*f2_g*f2_t
-	float g2 = f2[0]*f2[1]*f2[2]*f2[3]; 
-//    ld = -0.25*(m.log(np.linalg.det(F))-0.5*(m.log(g1*g2)))
-	float determinant = ComputeDeterminantOfFourByFourMatrix(&F);
-	if (determinant > 0){
-		logDet = -0.25*(log(determinant)-0.5*(log(g1*g2)));
-	}	
-	return (logDet);
-}
+// float ComputeLogDetDistance(vector<unsigned char> * seq1, vector <unsigned char> * seq2){
+// 	array<array<float,4>,4> F;
+// 	float logDet = 0.0;
+// 	int seqLength = seq1->size();
+// 	float d = 1/float(seqLength);
+// 	for (int i = 0; i < 4; i++){
+// 		for (int j = 0; j < 4; j++){
+// 			F[i][j] = 0;
+// 		}
+// 	}
+// 	for (int pos = 0 ; pos < seqLength; pos ++){
+// 		F[(*seq1)[pos]][(*seq2)[pos]] += d;
+// 	}
+// //	f1_a, f1_c, f1_g, f1_t = GetBaseFreq(seq1)
+// 	array <float, 4> f1 = GetBaseFreq(seq1);
+// //   g1 = f1_a*f1_c*f1_g*f1_t
+// 	float g1 = f1[0]*f1[1]*f1[2]*f1[3];
+// //  f2_a, f2_c, f2_g, f2_t = GetBaseFreq(seq2)
+// 	array <float, 4> f2 = GetBaseFreq(seq2);    
+// //  g2 = f2_a*f2_c*f2_g*f2_t
+// 	float g2 = f2[0]*f2[1]*f2[2]*f2[3]; 
+// //    ld = -0.25*(m.log(np.linalg.det(F))-0.5*(m.log(g1*g2)))
+// 	float determinant = ComputeDeterminantOfFourByFourMatrix(&F);
+// 	if (determinant > 0){
+// 		logDet = -0.25*(log(determinant)-0.5*(log(g1*g2)));
+// 	}	
+// 	return (logDet);
+// }
 
 vector<unsigned char> DecompressSequence(vector<unsigned char>* compressedSequence, vector<vector<int>>* sitePatternRepeats);
 

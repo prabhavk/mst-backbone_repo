@@ -3,15 +3,32 @@
 
 #include <random>
 #include <chrono>
-#include <eigen3/Eigen/Dense>
-#include <eigen3/unsupported/Eigen/MatrixFunctions>
-#include <boost/algorithm/string.hpp>
+// #include <eigen3/Eigen/Dense>
+// #include <eigen3/unsupported/Eigen/MatrixFunctions>
+// #include <boost/algorithm/string.hpp>
 #include <fstream>
 #include <math.h>
 #include <iomanip>
 #include "MST.h"
+#include "Matrix4f.hpp"
 //#include <boost/math/tools/minima.hpp>
-using namespace Eigen;
+// using namespace Eigen;
+
+
+inline bool starts_with(const std::string& str, const std::string& prefix) {
+    return str.size() >= prefix.size() &&
+           str.compare(0, prefix.size(), prefix) == 0;
+}
+
+// Matrix4f transposeMatrix4f(const Matrix4f& m) {
+//     Matrix4f t{};
+//     for (int i = 0; i < 4; ++i) {
+//         for (int j = 0; j < 4; ++j) {
+//             t[i][j] = m[j][i];
+//         }
+//     }
+//     return t;
+// }
 
 class SEM_vertex {	
 public:
@@ -48,8 +65,8 @@ public:
 	SEM_vertex (int idToAdd, vector <unsigned char> compressedSequenceToAdd) {
 		this->id = idToAdd;
 		this->compressedSequence = compressedSequenceToAdd;
-		this->transitionMatrix = ArrayXXf::Zero(4,4);
-		this->transitionMatrix_stored = ArrayXXf::Zero(4,4);
+		this->transitionMatrix = Matrix4f::Zero(); // Matrix4f::Zero();
+		this->transitionMatrix_stored = Matrix4f::Zero(); // Matrix4f::Zero();
 		for (int dna = 0; dna < 4; dna ++) {
 			this->transitionMatrix(dna,dna) = 1.0;
 			this->transitionMatrix_stored(dna,dna) = 1.0;
@@ -515,16 +532,18 @@ Matrix4f cliqueTree::GetP_XZ(SEM_vertex * X, SEM_vertex * Y, SEM_vertex * Z) {
     if (X->id < Y->id) {
 		P_XY = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(X,Y)];
 	} else {
-		P_XY = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(Y,X)].transpose();
+		// P_XY = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(Y,X)].transpose();
+		P_XY = transposeMatrix4f(this->marginalizedProbabilitiesForVariablePair[{Y, X}]);
 	}
 	if (Y->id < Z->id) {
 		P_YZ = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(Y,Z)];
 	} else {
-		P_YZ = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(Z,Y)].transpose();
+		// P_YZ = this->marginalizedProbabilitiesForVariablePair[pair<SEM_vertex *, SEM_vertex *>(Z,Y)].transpose();
+		P_YZ = transposeMatrix4f(this->marginalizedProbabilitiesForVariablePair[{Z, Y}]);
 	}
 //	cout << "P_XY is " << endl << P_XY << endl;
 //	cout << "P_YZ is " << endl << P_YZ << endl;
-	P_ZGivenY = ArrayXXf::Zero(4,4);
+	P_ZGivenY = Matrix4f::Zero(); //Matrix4f::Zero()
 	float rowSum;
 	for (int row = 0; row < 4; row ++) {		
 		rowSum = 0;
@@ -657,7 +676,11 @@ void cliqueTree::ComputeMarginalProbabilitesForEachEdge() {
 		if (C->x->id < C->y->id) {			
 			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->x,C->y),C->belief));
 		} else {
-			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->y,C->x),C->belief.transpose()));			
+			// this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->y,C->x),C->belief.transpose()));
+			this->marginalizedProbabilitiesForVariablePair.insert(make_pair(make_pair(C->y, C->x),transposeMatrix4f(C->belief)
+    )
+);
+
 		}
 	}
 }
@@ -681,7 +704,11 @@ void cliqueTree::ComputeMarginalProbabilitesForEachVariablePair() {
 		if (C->x->id < C->y->id) {			
 			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->x,C->y),C->belief));
 		} else {
-			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->y,C->x),C->belief.transpose()));			
+			// this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(C->y,C->x),C->belief.transpose()));			
+			this->marginalizedProbabilitiesForVariablePair.insert(std::make_pair(std::make_pair(C->y, C->x),transposeMatrix4f(C->belief)
+    )
+);
+
 		}
 //		if (C->y->name == "l_1") {
 //			cout << "belief for site " << this->site << " is " << endl;
@@ -704,6 +731,10 @@ void cliqueTree::ComputeMarginalProbabilitesForEachVariablePair() {
 			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(X,Z),P_XZ));			
 		} else {
 			this->marginalizedProbabilitiesForVariablePair.insert(pair<pair<SEM_vertex *, SEM_vertex *>, Matrix4f>(pair<SEM_vertex *, SEM_vertex *>(Z,X),P_XZ.transpose()));			
+			this->marginalizedProbabilitiesForVariablePair.insert(std::make_pair(std::make_pair(Z, X),transposeMatrix4f(P_XZ)
+    )
+);
+
 		}		
 	//	cout << "----------------------------------" << endl;
 	}
@@ -1087,6 +1118,7 @@ public:
 	void ComputePosteriorProbabilitiesUsingExpectedCounts();
 	void ComputePosteriorProbabilitiesUsingMAPEstimates();
 	void SetInfoForVerticesToAddToMST();
+	vector<string> split_ws(const string& s);
 	void SetIdsOfExternalVertices();
 	void ClearAncestralSequences();
 	void WriteParametersOfGMM(string GMMparametersFileName);
@@ -1191,8 +1223,8 @@ public:
 	void OptimizeParametersForMultiRateMarkovModel();
 	void InitializeParameters();
 	void ComputeTransitionMatrices();
-	float ComputeScalingFactor(Matrix4f Q);
-	MatrixXf ComputeStationaryDistribution(Matrix4f Q);
+	// float ComputeScalingFactor(Matrix4f Q);
+	// Matrix4f ComputeStationaryDistribution(Matrix4f Q);
 	void PerformModelSelection();
 	float BIC;
 	float AIC;
@@ -1238,7 +1270,7 @@ public:
 		// this->vertexName2IdMap = new map <string, int> ;
 		unsigned seed = chrono::system_clock::now().time_since_epoch().count();
 		this->generator = default_random_engine(seed);
-		this->I4by4 = ArrayXXf::Zero(4,4);
+		this->I4by4 = Matrix4f::Zero();
 		for (int i = 0; i < 4; i++) {
 			this->I4by4(i,i) = 1.0;
 		}
@@ -1641,7 +1673,8 @@ void SEM::ReadRootedTree(string treeFileName) {
 	v_id = 0;
 	ifstream edgeListFile(treeFileName.c_str());
 	for (string line; getline(edgeListFile, line);) {
-		boost::split(splitLine, line, [](char c){return c == '\t';});
+		auto splitLine = split_ws(line);
+		// boost::split(splitLine, line, [](char c){return c == '\t';});
 		u_name = splitLine[0];		
 		v_name = splitLine[1];
 		if (find(nonRootVertexNames.begin(),nonRootVertexNames.end(),v_name) == nonRootVertexNames.end()) {
@@ -1651,7 +1684,7 @@ void SEM::ReadRootedTree(string treeFileName) {
 			ancestorNames.push_back(u_name);
 		}
 		if (find(leafNames.begin(),leafNames.end(),v_name)==leafNames.end()) {
-			if(!boost::starts_with(v_name, "h_")) {
+			if(!starts_with(v_name, "h_")) {
 				leafNames.push_back(v_name);
 			}
 		}
@@ -1695,7 +1728,8 @@ void SEM::ReadRootedTree(string treeFileName) {
 	edgeListFile.clear();
 	edgeListFile.seekg(0, ios::beg);
 	for (string line; getline(edgeListFile, line);) {
-		boost::split(splitLine, line, [](char c){return c == '\t';});
+		auto splitLine = split_ws(line);
+		// boost::split(splitLine, line, [](char c){return c == '\t';});
 		u_name = splitLine[0];
 		v_name = splitLine[1];
 		u_id = this->GetVertexId(u_name);
@@ -1894,7 +1928,7 @@ void SEM::StoreEdgeListAndSeqToAdd() {
 }
 
 Matrix4f SEM::GetTransitionMatrix(SEM_vertex * p, SEM_vertex * c) {	
-	Matrix4f P = ArrayXXf::Zero(4,4);			
+	Matrix4f P = Matrix4f::Zero();// Matrix4f::Zero()		
 	int dna_p; int dna_c;
 	for (int site = 0; site < this->numberOfSitePatterns; site ++) {
 		if (p->compressedSequence[site] < 4 && c->compressedSequence[site] < 4) { // FIX_AMB
@@ -2338,8 +2372,13 @@ Matrix4f SEM::GetExpectedCountsForVariablePair(SEM_vertex * u, SEM_vertex * v) {
 	Matrix4f C_pc;
 	if (u->id < v->id) {
 		C_pc = this->expectedCountsForVertexPair[pair<SEM_vertex*,SEM_vertex*>(u,v)];	
-	} else {
-		C_pc = this->expectedCountsForVertexPair[pair<SEM_vertex*,SEM_vertex*>(v,u)].transpose();	
+	} else {		
+		C_pc = transposeMatrix4f(this->expectedCountsForVertexPair[
+			std::make_pair(v, u)
+		]
+);
+
+			
 	}
 	return (C_pc);
 }
@@ -2349,7 +2388,12 @@ Matrix4f SEM::GetPosteriorProbabilityForVariablePair(SEM_vertex * u, SEM_vertex 
 	if (u->id < v->id) {
 		P = this->posteriorProbabilityForVertexPair[pair<SEM_vertex *, SEM_vertex *>(u,v)];
 	} else {
-		P = this->posteriorProbabilityForVertexPair[pair<SEM_vertex *, SEM_vertex *>(v,u)].transpose();
+		// P = this->posteriorProbabilityForVertexPair[pair<SEM_vertex *, SEM_vertex *>(v,u)].transpose();
+		P = transposeMatrix4f(this->posteriorProbabilityForVertexPair[
+			std::make_pair(v, u)
+		]    
+);
+
 	}
 	return (P);
 }
@@ -2420,7 +2464,7 @@ void SEM::AddToExpectedCounts() {
 }
 
 Matrix4f SEM::GetObservedCounts(SEM_vertex * u, SEM_vertex * v) {	
-	Matrix4f countMatrix = ArrayXXf::Zero(4,4);
+	Matrix4f countMatrix = Matrix4f::Zero(); //Matrix4f::Zero()
 	int dna_u; int dna_v;
 	for (int i = 0; i < this->sequenceLength; i++) {
 		dna_u = u->compressedSequence[i];
@@ -2688,7 +2732,7 @@ void SEM::ResetExpectedCounts() {
 			v = idPtrPair_2.second;
 			if (!u->observed or !v->observed) {
 				if (u->id < v->id) {
-					this->expectedCountsForVertexPair[pair <SEM_vertex *, SEM_vertex *>(u,v)] = ArrayXXf::Zero(4,4);
+					this->expectedCountsForVertexPair[pair <SEM_vertex *, SEM_vertex *>(u,v)] = Matrix4f::Zero();
 				}	
 			}			
 		}
@@ -2724,7 +2768,7 @@ void SEM::InitializeExpectedCountsForEachVariablePair() {
 		for (pair<int,SEM_vertex *> idPtrPair_2 : * this->vertexMap) {
 			v = idPtrPair_2.second;
 			if (u->id < v->id) {
-				countMatrix = ArrayXXf::Zero(4,4);			
+				countMatrix = Matrix4f::Zero();			
 				if (u->observed and v->observed) {
 					for (int site = 0; site < this->numberOfSitePatterns; site++) {
 						dna_u = u->compressedSequence[site];
@@ -2748,7 +2792,7 @@ void SEM::InitializeExpectedCountsForEachEdge() {
 	this->expectedCountsForVertexPair.clear();
 	Matrix4f countMatrix;
 	for (pair <SEM_vertex *, SEM_vertex *> edge : this->edgesForPreOrderTreeTraversal) {
-		countMatrix = ArrayXXf::Zero(4,4);
+		countMatrix = Matrix4f::Zero();
 		tie (u,v) = edge;
 		if (u->id < v->id) {
 			vertexPair.first = u; vertexPair.second = v;
@@ -2785,7 +2829,7 @@ void SEM::InitializeExpectedCounts() {
 		for (pair<int,SEM_vertex *> idPtrPair_2 : * this->vertexMap) {
 			v = idPtrPair_2.second;
 			if (u->id < v->id) {
-				countMatrix = ArrayXXf::Zero(4,4);			
+				countMatrix = Matrix4f::Zero();			
 				if (u->observed and v->observed) {
 					for (int site = 0; site < this->numberOfSitePatterns; site++) {
 						dna_u = u->compressedSequence[site];
@@ -2984,7 +3028,10 @@ void SEM::ComputeExpectedLogLikelihood() {
 			if (p->id < c->id) {
 				S_pc = this->expectedCountsForVertexPair[pair<SEM_vertex*,SEM_vertex*>(p,c)];	
 			} else {
-				S_pc = this->expectedCountsForVertexPair[pair<SEM_vertex*,SEM_vertex*>(c,p)].transpose();	
+				// S_pc = this->expectedCountsForVertexPair[pair<SEM_vertex*,SEM_vertex*>(c,p)].transpose();
+				S_pc = transposeMatrix4f(this->expectedCountsForVertexPair[std::make_pair(c, p)]
+       );
+	
 			}
 			for (int dna_p = 0; dna_p < 4; dna_p ++) {
 				for (int dna_c = 0; dna_c < 4; dna_c ++) {
@@ -3176,142 +3223,142 @@ void SEM::ComputeGCCountsForEachVertex() {
 	}
 }
 
-float SEM::ComputeScalingFactor(Matrix4f Q){
-	MatrixXf Q_aug = ArrayXXf::Zero(4,5);
-	for (int row = 0; row < 4; row++){
-		for (int col = 0; col < 4; col++){
-			Q_aug(row, col) = Q(row, col);
-		}
-	}
-	for (int row = 0; row < 4; row++){
-		Q_aug(row, 4) = 1;
-	}	
-	MatrixXf b = ArrayXXf::Zero(5,1);
-	for (int row = 0; row < 4; row++){
-		b(row,0) = 0;
-	}
-	b(4,0) = 1;	
-	MatrixXf pi = ArrayXXf::Zero(1,4);
-	pi = Q_aug.transpose().colPivHouseholderQr().solve(b).transpose();
-	float scalingFactor = 0;
-	for (int i = 0; i < 4; i++){
-		scalingFactor -= pi(0,i) * Q(i,i);
-	}
-	return scalingFactor;
-}
+// float SEM::ComputeScalingFactor(Matrix4f Q){
+// 	Matrix4f Q_aug = ArrayXXf::Zero(4,5);
+// 	for (int row = 0; row < 4; row++){
+// 		for (int col = 0; col < 4; col++){
+// 			Q_aug(row, col) = Q(row, col);
+// 		}
+// 	}
+// 	for (int row = 0; row < 4; row++){
+// 		Q_aug(row, 4) = 1;
+// 	}	
+// 	Matrix4f b = ArrayXXf::Zero(5,1);
+// 	for (int row = 0; row < 4; row++){
+// 		b(row,0) = 0;
+// 	}
+// 	b(4,0) = 1;	
+// 	Matrix4f pi = ArrayXXf::Zero(1,4);
+// 	pi = Q_aug.transpose().colPivHouseholderQr().solve(b).transpose();
+// 	float scalingFactor = 0;
+// 	for (int i = 0; i < 4; i++){
+// 		scalingFactor -= pi(0,i) * Q(i,i);
+// 	}
+// 	return scalingFactor;
+// }
 
-MatrixXf SEM::ComputeStationaryDistribution(Matrix4f Q){
-	MatrixXf Q_aug = ArrayXXf::Zero(4,5);
-	for (int row = 0; row < 4; row++){
-		for (int col = 0; col < 4; col++){
-			Q_aug(row, col) = Q(row, col);
-		}
-	}
-	for (int row = 0; row < 4; row++){
-		Q_aug(row, 4) = 1;
-	}	
-	MatrixXf b = ArrayXXf::Zero(5,1);
-	for (int row = 0; row < 4; row++){
-		b(row,0) = 0;
-	}
-	b(4,0) = 1;	
-	MatrixXf pi = ArrayXXf::Zero(4,1);
-	pi = Q_aug.transpose().colPivHouseholderQr().solve(b);
-	return pi;	
-}
+// Matrix4f SEM::ComputeStationaryDistribution(Matrix4f Q){
+// 	Matrix4f Q_aug = ArrayXXf::Zero(4,5);
+// 	for (int row = 0; row < 4; row++){
+// 		for (int col = 0; col < 4; col++){
+// 			Q_aug(row, col) = Q(row, col);
+// 		}
+// 	}
+// 	for (int row = 0; row < 4; row++){
+// 		Q_aug(row, 4) = 1;
+// 	}	
+// 	Matrix4f b = ArrayXXf::Zero(5,1);
+// 	for (int row = 0; row < 4; row++){
+// 		b(row,0) = 0;
+// 	}
+// 	b(4,0) = 1;	
+// 	Matrix4f pi = ArrayXXf::Zero(4,1);
+// 	pi = Q_aug.transpose().colPivHouseholderQr().solve(b);
+// 	return pi;	
+// }
 
-void SEM::InitializeParameters() {
-	bool resetAllElementsOrRateMatrix = 0;
-	map <int, Matrix4f> transitionMatrixForEachCategory;
-	Matrix4f P; Matrix4f Q; float scalingFactor;
-	int rateCat;
-	for (int rateCat = 0 ; rateCat < this->numberOfRateCategories; rateCat ++) {		
-		P = ArrayXXf::Zero(4,4);
-		for (int i = 0; i < 4; i ++) {
-			P(i,i) = 1;
-		}
-		transitionMatrixForEachCategory.insert(make_pair(rateCat,P));
-	}
-	SEM_vertex * p; SEM_vertex * c; 
-	float sum;
-	int dna_p; int dna_c;
-	for (pair<SEM_vertex *, SEM_vertex *> edge : this->edgesForPreOrderTreeTraversal) {
-		tie (p, c) = edge;
-		rateCat = c->rateCategory;
-		P = ArrayXXf::Zero(4,4);
-		for (int site = 0; site < this->numberOfSitePatterns; site ++) {
-			dna_p = p->compressedSequence[site];
-			dna_c = c->compressedSequence[site];
-			P(dna_p,dna_c) += this->sitePatternWeights[site];
-		}
+// void SEM::InitializeParameters() {
+// 	bool resetAllElementsOrRateMatrix = 0;
+// 	map <int, Matrix4f> transitionMatrixForEachCategory;
+// 	Matrix4f P; Matrix4f Q; float scalingFactor;
+// 	int rateCat;
+// 	for (int rateCat = 0 ; rateCat < this->numberOfRateCategories; rateCat ++) {		
+// 		P = Matrix4f::Zero();
+// 		for (int i = 0; i < 4; i ++) {
+// 			P(i,i) = 1;
+// 		}
+// 		transitionMatrixForEachCategory.insert(make_pair(rateCat,P));
+// 	}
+// 	SEM_vertex * p; SEM_vertex * c; 
+// 	float sum;
+// 	int dna_p; int dna_c;
+// 	for (pair<SEM_vertex *, SEM_vertex *> edge : this->edgesForPreOrderTreeTraversal) {
+// 		tie (p, c) = edge;
+// 		rateCat = c->rateCategory;
+// 		P = Matrix4f::Zero();
+// 		for (int site = 0; site < this->numberOfSitePatterns; site ++) {
+// 			dna_p = p->compressedSequence[site];
+// 			dna_c = c->compressedSequence[site];
+// 			P(dna_p,dna_c) += this->sitePatternWeights[site];
+// 		}
 		
-		for (int i = 0; i < 4; i ++){
-			sum = 0;
-			for (int j = 0; j < 4; j ++) {
-				sum += P(i,j);
-			}
-			for (int j = 0; j < 4; j ++) {
-				P(i,j) /= sum;
-			}
-		}
-		transitionMatrixForEachCategory[rateCat] = transitionMatrixForEachCategory[rateCat] * P;
-	}
-	// Compute rate matrix as matrix logarithm
-	for (int rateCat = 0; rateCat < this->numberOfRateCategories; rateCat ++) {
-		P = transitionMatrixForEachCategory[rateCat];
-//		cout << "Transition matrix for rate cat " << rateCat << " is " << endl;
-//		cout << P << endl;
-		Q = P.log();
-		for (int row = 0; row < 4; row ++) {
-			for (int col = 0; col < 4; col ++) {
-				if (row != col){
-					if (Q(row,col) < pow(10,-5)) {
-						Q(row,col) = pow(10,-5);
-					}
-				}
-			}
-		}
-		Q /= Q(3,2);
-//		cout << Q << endl;
-//		cout << "Is element Q(0,1) nan ? " << isnan(Q(0,1));		
-		for (int row = 0; row < 4; row ++) {
-			for (int col = 0; col < 4; col ++) {
-				if (row != col) {
-					if (isnan(Q(row,col) or isinf(Q(row,col)))) {
-						resetAllElementsOrRateMatrix = 1;
-					}
-				}
-			}
-		}
+// 		for (int i = 0; i < 4; i ++){
+// 			sum = 0;
+// 			for (int j = 0; j < 4; j ++) {
+// 				sum += P(i,j);
+// 			}
+// 			for (int j = 0; j < 4; j ++) {
+// 				P(i,j) /= sum;
+// 			}
+// 		}
+// 		transitionMatrixForEachCategory[rateCat] = transitionMatrixForEachCategory[rateCat] * P;
+// 	}
+// 	// Compute rate matrix as matrix logarithm
+// 	for (int rateCat = 0; rateCat < this->numberOfRateCategories; rateCat ++) {
+// 		P = transitionMatrixForEachCategory[rateCat];
+// //		cout << "Transition matrix for rate cat " << rateCat << " is " << endl;
+// //		cout << P << endl;
+// 		Q = P.log();
+// 		for (int row = 0; row < 4; row ++) {
+// 			for (int col = 0; col < 4; col ++) {
+// 				if (row != col){
+// 					if (Q(row,col) < pow(10,-5)) {
+// 						Q(row,col) = pow(10,-5);
+// 					}
+// 				}
+// 			}
+// 		}
+// 		Q /= Q(3,2);
+// //		cout << Q << endl;
+// //		cout << "Is element Q(0,1) nan ? " << isnan(Q(0,1));		
+// 		for (int row = 0; row < 4; row ++) {
+// 			for (int col = 0; col < 4; col ++) {
+// 				if (row != col) {
+// 					if (isnan(Q(row,col) or isinf(Q(row,col)))) {
+// 						resetAllElementsOrRateMatrix = 1;
+// 					}
+// 				}
+// 			}
+// 		}
 		
-		uniform_real_distribution <> distribution(0.0, 1.0);	
-		if (resetAllElementsOrRateMatrix) {
-			for (int row = 0; row < 4; row ++) {
-				for (int col = 0; col < 4; col ++) {
-					if (row != col){						
-						Q(row,col) = distribution(generator);
-					}
-				}
-			}		
-		}		
-		Q /= Q(3,2);				
-		Q(0,0) = - (Q(0,1) + Q(0,2) + Q(0,3));
-		Q(1,1) = - (Q(1,0) + Q(1,2) + Q(1,3));
-		Q(2,2) = - (Q(2,0) + Q(2,1) + Q(2,3));
-		Q(3,3) = - (Q(3,0) + Q(3,1) + Q(3,2));
-		cout << "Initialized rate matrix for rate cat " << rateCat << " is " << endl;
-		cout << Q << endl;
-		this->rateMatrixPerRateCategory.insert(make_pair(rateCat,Q));
-		scalingFactor = this->ComputeScalingFactor(Q);
-		this->scalingFactorPerRateCategory.insert(make_pair(rateCat,scalingFactor));
-	}
-	Q = this->rateMatrixPerRateCategory[0];
-	MatrixXf pi_root = this->ComputeStationaryDistribution(Q);
-	for (int i = 0; i < 4; i ++) {
-		this->rootProbability[i] = pi_root(i);		
-	}	
-	this->root->rootProbability = this->rootProbability;	 
-}
+// 		uniform_real_distribution <> distribution(0.0, 1.0);	
+// 		if (resetAllElementsOrRateMatrix) {
+// 			for (int row = 0; row < 4; row ++) {
+// 				for (int col = 0; col < 4; col ++) {
+// 					if (row != col){						
+// 						Q(row,col) = distribution(generator);
+// 					}
+// 				}
+// 			}		
+// 		}		
+// 		Q /= Q(3,2);				
+// 		Q(0,0) = - (Q(0,1) + Q(0,2) + Q(0,3));
+// 		Q(1,1) = - (Q(1,0) + Q(1,2) + Q(1,3));
+// 		Q(2,2) = - (Q(2,0) + Q(2,1) + Q(2,3));
+// 		Q(3,3) = - (Q(3,0) + Q(3,1) + Q(3,2));
+// 		cout << "Initialized rate matrix for rate cat " << rateCat << " is " << endl;
+// 		cout << Q << endl;
+// 		this->rateMatrixPerRateCategory.insert(make_pair(rateCat,Q));
+// 		scalingFactor = this->ComputeScalingFactor(Q);
+// 		this->scalingFactorPerRateCategory.insert(make_pair(rateCat,scalingFactor));
+// 	}
+// 	Q = this->rateMatrixPerRateCategory[0];
+// 	Matrix4f pi_root = this->ComputeStationaryDistribution(Q);
+// 	for (int i = 0; i < 4; i ++) {
+// 		this->rootProbability[i] = pi_root(i);		
+// 	}	
+// 	this->root->rootProbability = this->rootProbability;	 
+// }
 
 void SEM::ComputeTransitionMatrices() {
 	float scalingFactor; Matrix4f Q; Matrix4f P; float t;
@@ -3752,7 +3799,7 @@ void SEM::ComputeMLRootedTreeForFullStructureSearch() {
 }
 
 Matrix4f SEM::GetP_yGivenx(Matrix4f P_xy) {
-	Matrix4f P_yGivenx = ArrayXXf::Zero(4,4);
+	Matrix4f P_yGivenx = Matrix4f::Zero();
 	array <float, 4> P_x;
 	for (int dna_x = 0; dna_x < 4; dna_x ++) {
 		P_x[dna_x] = 0;
@@ -3828,57 +3875,57 @@ void SEM::OptimizeQForRateCategory(int rateCat) {
 	konvge, kcount, &icount, &numres, &ifault);
 }
 
-void SEM::SetParametersForRateMatrixForNelderMead(double x[], int rateCat) {	
-	Matrix4f Q;
-	// a
-	Q(0,1) = x[0];
-	// b
-	Q(0,2) = x[1];
-	// c
-	Q(0,3) = x[2];
-	// d
-	Q(1,0) = x[3];
-	// e
-	Q(1,2) = x[4];
-	// f
-	Q(1,3) = x[5];
-	// g
-	Q(2,0) = x[6];
-	// h
-	Q(2,1) = x[7];
-	// i
-	Q(2,3) = x[8];
-	// j
-	Q(3,0) = x[9];
-	// k
-	Q(3,1) = x[10];
-	// set l to 1
-	Q(3,2) = 1.0;
-	// D1 
-	Q(0,0) = - (Q(0,1) + Q(0,2) + Q(0,3));
-	// D2 
-	Q(1,1) = - (Q(1,0) + Q(1,2) + Q(1,3));
-	// D3 
-	Q(2,2) = - (Q(2,0) + Q(2,1) + Q(2,3));
-	// D4 
-	Q(3,3) = - (Q(3,0) + Q(3,1) + Q(3,2));
+// void SEM::SetParametersForRateMatrixForNelderMead(double x[], int rateCat) {	
+// 	Matrix4f Q;
+// 	// a
+// 	Q(0,1) = x[0];
+// 	// b
+// 	Q(0,2) = x[1];
+// 	// c
+// 	Q(0,3) = x[2];
+// 	// d
+// 	Q(1,0) = x[3];
+// 	// e
+// 	Q(1,2) = x[4];
+// 	// f
+// 	Q(1,3) = x[5];
+// 	// g
+// 	Q(2,0) = x[6];
+// 	// h
+// 	Q(2,1) = x[7];
+// 	// i
+// 	Q(2,3) = x[8];
+// 	// j
+// 	Q(3,0) = x[9];
+// 	// k
+// 	Q(3,1) = x[10];
+// 	// set l to 1
+// 	Q(3,2) = 1.0;
+// 	// D1 
+// 	Q(0,0) = - (Q(0,1) + Q(0,2) + Q(0,3));
+// 	// D2 
+// 	Q(1,1) = - (Q(1,0) + Q(1,2) + Q(1,3));
+// 	// D3 
+// 	Q(2,2) = - (Q(2,0) + Q(2,1) + Q(2,3));
+// 	// D4 
+// 	Q(3,3) = - (Q(3,0) + Q(3,1) + Q(3,2));
 	
-	this->rateMatrixPerRateCategory[rateCat] = Q;
-	float scalingFactor = this->ComputeScalingFactor(Q);
-	this->scalingFactorPerRateCategory[rateCat] = scalingFactor;
-	if (this->root->rateCategory == rateCat) {
-		MatrixXf stationaryDistribution = this->ComputeStationaryDistribution(Q);
-		for (int i = 0; i < 4; i++) {
-			if (stationaryDistribution(i,0) < 0) {
-				cout << "Stationary distribution has negative entry" << endl;
-				cout << "Rate matrix is " << endl << Q << endl;
-			}
-			this->rootProbability[i] = stationaryDistribution(i,0);			
-		}
-		this->root->rootProbability = this->rootProbability;
-	}
-	return;
-}
+// 	this->rateMatrixPerRateCategory[rateCat] = Q;
+// 	float scalingFactor = this->ComputeScalingFactor(Q);
+// 	this->scalingFactorPerRateCategory[rateCat] = scalingFactor;
+// 	if (this->root->rateCategory == rateCat) {
+// 		Matrix4f stationaryDistribution = this->ComputeStationaryDistribution(Q);
+// 		for (int i = 0; i < 4; i++) {
+// 			if (stationaryDistribution(i,0) < 0) {
+// 				cout << "Stationary distribution has negative entry" << endl;
+// 				cout << "Rate matrix is " << endl << Q << endl;
+// 			}
+// 			this->rootProbability[i] = stationaryDistribution(i,0);			
+// 		}
+// 		this->root->rootProbability = this->rootProbability;
+// 	}
+// 	return;
+// }
 
 double SEM::GetNegExpectedLogLikelihoodForRateCat(double x[], int rateCat) {
 	double valueToReturn;
@@ -4500,6 +4547,13 @@ void SEM::OptimizeQAndtForRateCategory(int rateCat) {
 //	cout << this->logLikelihood << endl;
 }
 
+vector<string> SEM::split_ws(const string& s) {
+    istringstream iss(s);
+    vector <string> out;
+    for (string tok; iss >> tok;) out.push_back(tok);
+    return out;
+}
+
 void SEM::ComputeMLEstimatesOfMultiRateMMGivenExpectedDataCompletion() {
 	for (int rateCat = 0; rateCat < this->numberOfRateCategories; rateCat++) {
 		this->OptimizeQAndtForRateCategory(rateCat);
@@ -4517,7 +4571,10 @@ void SEM::ComputeMLEstimatesOfGMMGivenExpectedDataCompletion() {
 				P_xy = this->posteriorProbabilityForVertexPair[make_pair(x,y)];
 			} else {
 				// Check following step
-				P_xy = this->posteriorProbabilityForVertexPair[make_pair(y,x)].transpose();
+				// P_xy = this->posteriorProbabilityForVertexPair[make_pair(y,x)].transpose();
+				P_xy = transposeMatrix4f(this->posteriorProbabilityForVertexPair[{y, x}]);
+
+
 			}
 			// MLE of transition matrices
 			y->transitionMatrix = this->GetP_yGivenx(P_xy);
@@ -4525,7 +4582,7 @@ void SEM::ComputeMLEstimatesOfGMMGivenExpectedDataCompletion() {
 			// MLE of root probability
 			this->rootProbability = this->posteriorProbabilityForVertex[y];
 			y->rootProbability = this->rootProbability;
-			y->transitionMatrix = ArrayXXf::Zero(4,4);
+			y->transitionMatrix = Matrix4f::Zero();
 			for (int i = 0; i < 4; i ++) {
 				y->transitionMatrix(i,i) = 1.0;
 			}
@@ -5163,7 +5220,7 @@ void SEM::ComputeMAPEstimateOfAncestralSequencesUsingHardEM() {
 				c = idPtrPair.second;
 				if (c->parent != c) {
 					p = c->parent;
-					P = ArrayXXf::Zero(4,4);
+					P = Matrix4f::Zero();
 					for (int site = 0; site < this->numberOfSitePatterns; site++) {
 						dna_p = p->compressedSequence[site];
 						dna_c = c->compressedSequence[site];
@@ -5307,7 +5364,7 @@ void SEM::ComputePosteriorProbabilitiesUsingMAPEstimates() {
 		// Posterior probabilies for vertex pair (u,v)
 		for (unsigned int v_id = u_id + 1 ; v_id < this->vertexMap->size()-1; v_id ++) {			
 			v = (*this->vertexMap)[v_id];
-			P = ArrayXXf::Zero(4,4);
+			P = Matrix4f::Zero();
 			for (int site = 0; site < this->numberOfSitePatterns; site++ ) {		
 				dna_u = u->compressedSequence[site];
 				dna_v = v->compressedSequence[site];
@@ -5377,7 +5434,7 @@ float SEM::GetExpectedMutualInformation(SEM_vertex * x, SEM_vertex* y) {
 }
 
 void SEM::ComputeChowLiuTree() {
-	using namespace boost;	
+	// using namespace boost;	
 	this->ClearAllEdges();
 	int numberOfVertices = this->vertexMap->size();
 	for (int i = 0; i < numberOfVertices; i++) {
@@ -5386,8 +5443,8 @@ void SEM::ComputeChowLiuTree() {
 	const int numberOfEdges = numberOfVertices * (numberOfVertices-1)/2;	
 	float maxMutualInformation = 0;
 	float mutualInformation;
-	float * shiftedNegMutualInformation;
-	shiftedNegMutualInformation = new float [numberOfEdges];		
+	float * NegMutualInformation;
+	NegMutualInformation = new float [numberOfEdges];		
 	SEM_vertex * u; SEM_vertex * v;	
 	int edgeIndex = 0;
 	for (int i=0; i<numberOfVertices; i++) {
@@ -5395,7 +5452,7 @@ void SEM::ComputeChowLiuTree() {
 		for (int j=i+1; j<numberOfVertices; j++) {
 			v = (*this->vertexMap)[j];
 			mutualInformation = this->GetExpectedMutualInformation(u,v);
-			shiftedNegMutualInformation[edgeIndex] = -1 * mutualInformation;
+			NegMutualInformation[edgeIndex] = -1 * mutualInformation;
 			if (mutualInformation > maxMutualInformation) {
 				maxMutualInformation = mutualInformation;
 			}
@@ -5406,10 +5463,10 @@ void SEM::ComputeChowLiuTree() {
 	// Compute shifted mutual information as follows
 	// shifted_negative_MI = max ({MI}) - MI + 0.00001
 	// 0.00001 is added to ensure that smallest shifted_negative_MI is greater than 0
-	maxMutualInformation += 0.00001;
-	for (int i = 0; i < numberOfEdges; i++) {
-		shiftedNegMutualInformation[i] += maxMutualInformation;
-	}
+	// maxMutualInformation += 0.00001;
+	// for (int i = 0; i < numberOfEdges; i++) {
+	// 	shiftedNegMutualInformation[i] += maxMutualInformation;
+	// }
 	
 	typedef pair <int, int> E;
 
@@ -5423,11 +5480,18 @@ void SEM::ComputeChowLiuTree() {
 		}
 	}
 	
-	typedef adjacency_list <vecS, vecS, undirectedS, property <vertex_distance_t, int>, property <edge_weight_t, float> > Graph;
-	Graph g(edges, edges + numberOfEdges, shiftedNegMutualInformation, numberOfVertices);
-	vector < graph_traits < Graph >::vertex_descriptor >  p(num_vertices(g));
-	prim_minimum_spanning_tree(g, &p[0]);	
+	// typedef adjacency_list <vecS, vecS, undirectedS, property <vertex_distance_t, int>, property <edge_weight_t, float> > Graph;
+	// Graph g(edges, edges + numberOfEdges, shiftedNegMutualInformation, numberOfVertices);
+	// vector < graph_traits < Graph >::vertex_descriptor >  p(num_vertices(g));
+	// prim_minimum_spanning_tree(g, &p[0]);	
 	
+
+	vector<int> p(numberOfVertices); 
+
+	prim_graph p_graph(numberOfVertices, edges, NegMutualInformation, numberOfEdges);
+	
+	prim(p_graph, &p[0]);
+
 	for (size_t i = 0; i != p.size(); i++) {
 		if (p[i] != i) {
 			u = (*this->vertexMap)[i];
@@ -5450,7 +5514,7 @@ void SEM::ComputeChowLiuTree() {
 		}
 	}	
 	delete[] edges;
-	delete[] shiftedNegMutualInformation;
+	delete[] NegMutualInformation;
 }
 
 void SEM::OptimizeTopology() {
@@ -5892,7 +5956,7 @@ float SEM::ComputeDistance(int v_i, int v_j) {
 		float det_of_count_frequency_matrix;
 		array <float, 4> f_i;
 		array <float, 4> f_j;
-		Matrix4f F = ArrayXXf::Zero(4,4);
+		Matrix4f F = Matrix4f::Zero();
 		f_i[0] = 0.0;
 		f_i[1] = 0.0;
 		f_i[2] = 0.0;
