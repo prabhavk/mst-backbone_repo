@@ -1,0 +1,11 @@
+mst-backbone
+mst-backbone.o
+UNRESTselector.o
+UNRESTselector
+data/
+empirical_data.tar
+empirical_data/
+pythenv/
+test_anomaly/
+test_batch/
+test_data/
